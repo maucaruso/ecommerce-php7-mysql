@@ -10,6 +10,8 @@ class Page
   private $tpl;
   private $options = [];
   private $defaults = [
+    "header"=>true,
+    "footer"=>true,
     "data"=>[]
   ];
 
@@ -32,7 +34,7 @@ class Page
 
     $this->setData($this->options["data"]);
 
-    $this->tpl->draw("partials".DIRECTORY_SEPARATOR."header");
+    if ($this->options['header']) $this->tpl->draw("partials".DIRECTORY_SEPARATOR."header");
 
   }
 
@@ -57,7 +59,7 @@ class Page
   public function __destruct() 
   {
     
-    $this->tpl->draw("partials".DIRECTORY_SEPARATOR."footer");
+    if ($this->options['footer']) $this->tpl->draw("partials".DIRECTORY_SEPARATOR."footer");
 
   }
 
