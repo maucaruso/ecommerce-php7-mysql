@@ -13,13 +13,13 @@ class Page
     "data"=>[]
   ];
 
-  public function __construct($opts = array()) 
+  public function __construct($opts = array(), $tpl_dir = "views".DIRECTORY_SEPARATOR."website")
   {
 
     $this->options = array_merge($this->defaults, $opts);
 
     $config = array(
-      "tpl_dir"       => $_SERVER['DOCUMENT_ROOT'].DIRECTORY_SEPARATOR."views".DIRECTORY_SEPARATOR,
+      "tpl_dir"       => $_SERVER['DOCUMENT_ROOT'].DIRECTORY_SEPARATOR.$tpl_dir.DIRECTORY_SEPARATOR,
       "cache_dir"     => $_SERVER['DOCUMENT_ROOT'].DIRECTORY_SEPARATOR."views".DIRECTORY_SEPARATOR."cache".DIRECTORY_SEPARATOR,
       "auto_escape"   => true,
       "base_url" => null,
