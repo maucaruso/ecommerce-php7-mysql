@@ -2,12 +2,17 @@
 
 use \Hcode\Page;
 use \Hcode\Model\Category;
+use \Hcode\Model\Product;
 
 $app->get('/', function() {
+
+	$products = Product::listAll();
     
 	$page = new Page();
 
-	$page->setTpl("home".DIRECTORY_SEPARATOR."index");
+	$page->setTpl("home".DIRECTORY_SEPARATOR."index", [
+		"products"=>Product::checkList($products)
+	]);
 
 });
 
