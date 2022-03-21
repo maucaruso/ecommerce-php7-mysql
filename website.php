@@ -26,7 +26,7 @@ $app->get("/categories/:id", function ($idcategory) {
 
 	$page->setTpl("categories".DIRECTORY_SEPARATOR."category", [
 		'category'=>$category->getValues(),
-		'products'=>[]
+		'products'=>Product::checkList($category->getProducts())
 	]);
 
 });
