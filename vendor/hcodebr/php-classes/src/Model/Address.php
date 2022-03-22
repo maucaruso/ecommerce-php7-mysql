@@ -8,74 +8,44 @@ use Hcode\Model;
 class Address extends Model 
 {
 
-  const SESSION = "Cart";
-  const SESSION_ERROR = "CartError";
+  const SESSION_ERROR = "AddressError";
 
-  public static function getFromSession()
+  public static function getCEP($nrcep)
   {
 
-    $cart = new Cart();
+    $nrcep = str_replace("-", "", $nrcep);
 
-    if (isset($_SESSION[Cart::SESSION]) && (int)$_SESSION[Cart::SESSION]['idcart'] > 0 ) {
+    $ch = curl_init();
 
-      $cart->get((int)$_SESSION[Cart::SESSION]['idcart']);
+    curl_setopt($ch, CURLOPT_URL, "http://viacep.com.br/ws/$nrcep/json/");
 
-    } else {
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-      $cart->getFromSessionID();
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
-      if (!(int)$cart->getidcart() > 0) {
+    $data = json_decode(curl_exec($ch), true);
 
-        $data = [
-          'dessessionid'=>session_id()
-        ];
+    curl_close($ch);
 
-        if (User::checkLogin(false)) {
-
-          $user = User::getFromSession();
-
-          $data['iduser'] = $user->getIdUser();
-
-        }
-
-        $cart->setData($data);
-
-        $cart->save();
-
-        $cart->setToSession();
-
-      }
-
-    }
-
-    return $cart;
+    return $data;
 
   }
 
-  public static function getFromSessionid()
+  public function loadFromCEP($nrcep)
   {
 
-    $sql = new Sql();
+    $data = Address::getCEP($nrcep);
 
-    $results = $sql->select("SELECT * FROM tb_carts WHERE dessessionid = :idcart", [
-      'idcart'=>session_id()
-    ]);
+    if (isset($data['logradouro']) && $data['logradouro']) {
+      
+      $this->setdesaddress($data['logradouro']);
+      $this->setdescomplement($data['complemento']);
+      $this->setdesdistrict($data['bairro']);
+      $this->setdescity($data['localidade']);
+      $this->setdesstate($data['uf']);
+      $this->setdescountry('Brasil');
+      $this->setdeszipcode($nrcep);
 
-  }
-
-  public function get(int $idcart)
-  {
-
-    $sql = new Sql();
-
-    $results = $sql->select("SELECT * FROM tb_carts WHERE idcart = :idcart", [
-      ":idcart"=>$idcart,
-    ]);
-
-    if (count($results) > 0) {
-
-      $this->setData($results[0]);
-    
     }
 
   }
@@ -85,185 +55,39 @@ class Address extends Model
 
     $sql = new Sql();
 
-    $results = $sql->select("CALL sp_carts_save(:idcart, :dessessionid, :iduser, :deszipcode, :vlfreight, :nrdays)", [
-      ":idcart"=>$this->getidcart(),
-      ":dessessionid"=>$this->getdessessionid(),
-      ":iduser"=>$this->getiduser(),
-      ":deszipcode"=>$this->getdeszipcode(),
-      ":vlfreight"=>$this->getvlfreight(),
-      ":nrdays"=>$this->getnrdays()
-    ]);
-
-    $this->setData($results[0]);
-
-  }
-
-  public function setToSession()
-  {
-
-    $_SESSION[Cart::SESSION] = $this->getValues();
-
-  }
-
-  public function addProduct(Product $product)
-  {
-
-    $sql = new Sql();
-
-    $sql->query("INSERT INTO tb_cartsproducts (idcart, idproduct) VALUES(:idcart, :idproduct)", [
-      ':idcart'=>$this->getidcart(),
-      ':idproduct'=>$product->getidproduct()
-    ]);
-
-    $this->getCalculateTotal();
-
-  }
-
-  public function removeProduct(Product $product, $all = false)
-  {
-
-    $sql = new Sql();
-
-    if ($all) {
-
-      $sql->query("UPDATE tb_cartsproducts SET dtremoved = NOW() WHERE idcart = :idcart AND idproduct = :idproduct AND dtremoved IS NULL", [
-        ':idcart'=>$this->getidcart(),
-        ':idproduct'=>$product->getidproduct()
-      ]);
-
-    } else {
-
-      $sql->query("UPDATE tb_cartsproducts SET dtremoved = NOW() WHERE idcart = :idcart AND idproduct = :idproduct AND dtremoved IS NULL LIMIT 1", [
-        ':idcart'=>$this->getidcart(),
-        ':idproduct'=>$product->getidproduct()
-      ]);
-
-    }
-
-    $this->getCalculateTotal();
-
-  }
-
-  public function getProducts()
-  {
-
-    $sql = new Sql();
-
-    return Product::checkList($sql->select("
-      SELECT b.idproduct, b.desproduct, b.vlprice, b.vlwidth, b.vlheight, b.vllength, b.vlweight, b.desurl, COUNT(*) AS nrqtd, SUM(b.vlprice) AS vltotal 
-      FROM tb_cartsproducts a
-      INNER JOIN tb_products b 
-      ON a.idproduct = b.idproduct
-      WHERE a.idcart = :idcart AND a.dtremoved IS NULL 
-      GROUP BY b.idproduct, b.desproduct, b.vlprice, b.vlwidth, b.vlheight, b.vllength, b.vlweight, b.desurl
-      ORDER BY b.desproduct
-    ", [
-      ':idcart'=>$this->getidcart(),
-
-    ]));
-
-  }
-
-  public function getProductsTotals()
-  {
-
-    $sql = new Sql();
-
-    $results = $sql->select("
-      SELECT SUM(vlprice) AS vlprice, SUM(vlwidth) AS vlwidth, SUM(vlheight) AS vlheight, SUM(vllength) AS vllength, SUM(vlweight) AS vlweight, COUNT(*) AS nrqtd
-      FROM tb_products a 
-      INNER JOIN tb_cartsproducts b ON a.idproduct = b.idproduct
-      WHERE b.idcart = :idcart AND dtremoved IS NULL;
-    ", [
-      ":idcart"=>$this->getidcart()
+    $results = $sql->select("CALL sp_addresses_save(:idaddress, :idperson, :desaddress, :descomplement, :descity, :desstate, :descountry, :deszipcode, :desdistrict)", [
+      ':idaddress'=>$this->getidaddress(),
+      ':idperson'=>$this->getidperson(),
+      ':desaddress'=>utf8_decode($this->getdesaddress()),
+      ':descomplement'=>utf8_decode($this->getdescomplement()),
+      ':descity'=>utf8_decode($this->getdescity()),
+      ':desstate'=>utf8_decode($this->getdesstate()),
+      ':descountry'=>utf8_decode($this->getdescountry()),
+      ':deszipcode'=>$this->getdeszipcode(),
+      ':desdistrict'=>$this->getdesdistrict()
     ]);
 
     if (count($results) > 0) {
-      return $results[0];
-    } else {
-      return [];
-    }
 
-  }
-
-  public function setFreight($nrzipcode)
-  {
-
-    $nrzipcode = str_replace('-', '', $nrzipcode);
-
-    $totals = $this->getProductsTotals();
-
-    if ($totals['nrqtd'] > 0) {
-
-      if ($totals['vlheight'] < 2) $totals['vlheight'] = 2;
-      if ($totals['vllength'] < 16) $totals['vllength'] = 16;
-
-      $qs = http_build_query([
-        'nCdEmpresa'=>'',
-        'sDsSenha'=>'',
-        'nCdServico'=>'40010',
-        'sCepOrigem'=>'09130230',
-        'sCepDestino'=>$nrzipcode,
-        'nVlPeso'=>$totals['vlweight'],
-        'nCdFormato'=>'1',
-        'nVlComprimento'=>$totals['vllength'],
-        'nVlAltura'=>$totals['vlheight'],
-        'nVlLargura'=>$totals['vlwidth'],
-        'nVlDiametro'=>'0',
-        'sCdMaoPropria'=>'S',
-        'nVlValorDeclarado'=>$totals['vlprice'],
-        'sCdAvisoRecebimento'=>'S'
-      ]);
-
-      $xml = simplexml_load_file("http://ws.correios.com.br/calculador/CalcPrecoPrazo.asmx/CalcPrecoPrazo?".$qs);
-
-      $result = $xml->Servicos->cServico;
-
-      if ($result->MsgErro != '') {
-
-        Cart::setMsgError($result->MsgErro);
-
-      } else {
-
-        Cart::clearMsgError();("");
-
-      }
-
-      $this->setnrdays($result->PrazoEntrega);
-      $this->setvlfreight(Cart::formatValueToDecimal($result->Valor));
-      $this->setdeszipcode($nrzipcode);
-
-      $this->save();
-
-    } else {
-
-
+      $this->setData($results[0]);
 
     }
-
-  }
-
-  public static function formatValueToDecimal($value):float
-  {
-
-    $value = str_replace('.', '', $value);
-    return (float)str_replace(',', '.', $value);
 
   }
 
   public static function setMsgError($msg)
   {
 
-    $_SESSION[Cart::SESSION_ERROR] = $msg;
+    $_SESSION[Address::SESSION_ERROR] = $msg;
 
   }
 
   public static function getMsgError()
   {
 
-    $msg = isset($_SESSION[Cart::SESSION_ERROR]) ? $_SESSION[Cart::SESSION_ERROR] : "";
+    $msg = isset($_SESSION[Address::SESSION_ERROR]) ? $_SESSION[Address::SESSION_ERROR] : "";
 
-    Cart::clearMsgError();
+    Address::clearMsgError();
 
     return $msg;
 
@@ -272,39 +96,7 @@ class Address extends Model
   public static function clearMsgError()
   {
 
-    $_SESSION[Cart::SESSION_ERROR] = NULL;
-
-  }
-
-  public function updateFreight()
-  {
-
-    if ($this->getdeszipcode() != '') {
-
-      $this->setFreight($this->getdeszipcode());
-
-    }
-
-  }
-
-  public function getValues()
-  {
-
-    $this->getCalculateTotal();
-
-    return parent::getValues();
-
-  }
-
-  public function getCalculateTotal()
-  {
-
-    $this->updateFreight();
-
-    $totals = $this->getProductsTotals();
-
-    $this->setvlsubtotal($totals['vlprice']);
-    $this->setvltotal($totals['vlprice'] + $this->getvlfreight());
+    $_SESSION[Address::SESSION_ERROR] = NULL;
 
   }
 
