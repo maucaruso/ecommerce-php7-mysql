@@ -6,17 +6,18 @@ use \Hcode\Model\Product;
 use \Hcode\Model\Cart;
 use \Hcode\Model\Address;
 use \Hcode\Model\User;
+use \Hcode\Model\Order;
+use \Hcode\Model\OrderStatus;
 
-$app->get('/', function() {
+$app->get('/', function () {
 
 	$products = Product::listAll();
-    
+
 	$page = new Page();
 
-	$page->setTpl("home".DIRECTORY_SEPARATOR."index", [
-		"products"=>Product::checkList($products)
+	$page->setTpl("home" . DIRECTORY_SEPARATOR . "index", [
+		"products" => Product::checkList($products)
 	]);
-
 });
 
 $app->get("/categories/:id", function ($idcategory) {
@@ -31,24 +32,23 @@ $app->get("/categories/:id", function ($idcategory) {
 
 	$pages = [];
 
-	for ($i=1; $i <= $pagination["pages"]; $i++) {
+	for ($i = 1; $i <= $pagination["pages"]; $i++) {
 		array_push($pages, [
-			'link'=>'/categories/'.$category->getidcategory()."?page=".$i,
-			'page'=>$i
+			'link' => '/categories/' . $category->getidcategory() . "?page=" . $i,
+			'page' => $i
 		]);
 	}
 
 	$page = new Page();
 
-	$page->setTpl("categories".DIRECTORY_SEPARATOR."category", [
-		'category'=>$category->getValues(),
-		'products'=>$pagination["data"],
-		'pages'=>$pages
+	$page->setTpl("categories" . DIRECTORY_SEPARATOR . "category", [
+		'category' => $category->getValues(),
+		'products' => $pagination["data"],
+		'pages' => $pages
 	]);
-
 });
 
-$app->get("/products/:desurl", function($desurl) {
+$app->get("/products/:desurl", function ($desurl) {
 
 	$product = new Product();
 
@@ -56,28 +56,26 @@ $app->get("/products/:desurl", function($desurl) {
 
 	$page = new Page();
 
-	$page->setTpl("product-detail".DIRECTORY_SEPARATOR."product-detail", [
-		'product'=>$product->getValues(),
-		'categories'=>$product->getCategories()
+	$page->setTpl("product-detail" . DIRECTORY_SEPARATOR . "product-detail", [
+		'product' => $product->getValues(),
+		'categories' => $product->getCategories()
 	]);
-
 });
 
-$app->get("/cart", function(){
+$app->get("/cart", function () {
 
 	$cart = Cart::getFromSession();
 
 	$page = new Page();
 
-	$page->setTpl("cart".DIRECTORY_SEPARATOR."cart", [
-		'cart'=>$cart->getValues(),
-		'products'=>$cart->getProducts(),
-		'error'=>Cart::getMsgError()
+	$page->setTpl("cart" . DIRECTORY_SEPARATOR . "cart", [
+		'cart' => $cart->getValues(),
+		'products' => $cart->getProducts(),
+		'error' => Cart::getMsgError()
 	]);
-
 });
 
-$app->get("/cart/:idproduct/add", function($idproduct){
+$app->get("/cart/:idproduct/add", function ($idproduct) {
 
 	$product = new Product($idproduct);
 
@@ -90,15 +88,13 @@ $app->get("/cart/:idproduct/add", function($idproduct){
 	for ($i = 0; $i < $qtd; $i++) {
 
 		$cart->addProduct($product);
-		
 	}
 
 	header("Location: /cart");
 	exit;
-
 });
 
-$app->get("/cart/:idproduct/minus", function($idproduct){
+$app->get("/cart/:idproduct/minus", function ($idproduct) {
 
 	$product = new Product($idproduct);
 
@@ -110,10 +106,9 @@ $app->get("/cart/:idproduct/minus", function($idproduct){
 
 	header("Location: /cart");
 	exit;
-
 });
 
-$app->get("/cart/:idproduct/remove", function($idproduct){
+$app->get("/cart/:idproduct/remove", function ($idproduct) {
 
 	$product = new Product($idproduct);
 
@@ -125,10 +120,9 @@ $app->get("/cart/:idproduct/remove", function($idproduct){
 
 	header("Location: /cart");
 	exit;
-
 });
 
-$app->post("/cart/freight", function() {
+$app->post("/cart/freight", function () {
 
 	$cart = Cart::getFromSession();
 
@@ -136,10 +130,9 @@ $app->post("/cart/freight", function() {
 
 	header("Location: /cart");
 	exit;
-
 });
 
-$app->get('/checkout', function() {
+$app->get('/checkout', function () {
 
 	User::verifyLogin(false);
 
@@ -149,7 +142,6 @@ $app->get('/checkout', function() {
 	if (isset($_GET['zipcode'])) {
 
 		$_GET['zipcode'] = $cart->getdeszipcode();
-
 	}
 
 	if (isset($_GET['zipcode'])) {
@@ -160,7 +152,6 @@ $app->get('/checkout', function() {
 		$cart->save();
 
 		$cart->getCalculateTotal();
-
 	}
 
 	if (!$address->getdesaddress()) $address->setdesaddress('');
@@ -173,16 +164,15 @@ $app->get('/checkout', function() {
 
 	$page = new Page();
 
-	$page->setTpl("checkout".DIRECTORY_SEPARATOR."checkout", [
-		'cart'=>$cart->getValues(),
-		'address'=>$address->getValues(),
-		'products'=>$cart->getProducts(),
-		'error'=>Address::getMsgError()
+	$page->setTpl("checkout" . DIRECTORY_SEPARATOR . "checkout", [
+		'cart' => $cart->getValues(),
+		'address' => $address->getValues(),
+		'products' => $cart->getProducts(),
+		'error' => Address::getMsgError()
 	]);
-
 });
 
-$app->post("/checkout", function() {
+$app->post("/checkout", function () {
 
 	User::verifyLogin(false);
 
@@ -239,53 +229,63 @@ $app->post("/checkout", function() {
 
 	$address->save();
 
-	header('Location: /order');
-	exit;
+	$cart = Cart::getFromSession();
 
+	$cart->getCalculateTotal();
+
+	$order = new Order();
+
+	$order->setData([
+		'idcart' => $cart->getidcart(),
+		'idaddress' => $address->getidaddress(),
+		'iduser' => $user->getiduser(),
+		'idstatus' => OrderStatus::EM_ABERTO,
+		'vltotal' => $cart->getvltotal() + $cart->getvlfreight()
+	]);
+
+	$order->save();
+
+	header('Location: /order/' . $order->getidorder());
+	exit;
 });
 
-$app->get('/login', function(){
+$app->get('/login', function () {
 
 	$page = new Page();
 
-	$page->setTpl("login".DIRECTORY_SEPARATOR."login", [
-		'error'=>User::getError(),
-		'errorRegister'=>User::getErrorRegister(),
-		'registerValues'=>(isset($_SESSION['registerValues'])) ? $_SESSION['registerValues'] : ['name'=>'','email'=>'','phone'=>'']
+	$page->setTpl("login" . DIRECTORY_SEPARATOR . "login", [
+		'error' => User::getError(),
+		'errorRegister' => User::getErrorRegister(),
+		'registerValues' => (isset($_SESSION['registerValues'])) ? $_SESSION['registerValues'] : ['name' => '', 'email' => '', 'phone' => '']
 	]);
-
 });
 
-$app->post('/login', function(){
+$app->post('/login', function () {
 
 	try {
 
 		User::login($_POST['login'], $_POST['password']);
 
-		header("Location: /checkout");	
+		header("Location: /checkout");
 		exit;
-
 	} catch (Exception $e) {
 
 		User::setError($e->getMessage());
-		
-		header("Location: /checkout");	
+
+		header("Location: /checkout");
 		exit;
-
 	}
-
 });
 
-$app->get("/logout", function(){
+$app->get("/logout", function () {
 
 	User::logout();
 
 	header("Location: /login");
 	exit;
-
 });
 
-$app->post("/register", function(){
+$app->post("/register", function () {
 
 	$_SESSION['registerValues'] = $_POST;
 
@@ -294,7 +294,6 @@ $app->post("/register", function(){
 		User::setErrorRegister("Preencha o nome do usuário");
 		header("Location: /login");
 		exit;
-
 	}
 
 	if (!isset($_POST['email']) || $_POST['email'] == '') {
@@ -302,7 +301,6 @@ $app->post("/register", function(){
 		User::setErrorRegister("Preencha o e-mail");
 		header("Location: /login");
 		exit;
-
 	}
 
 	if (!isset($_POST['password']) || $_POST['password'] == '') {
@@ -310,7 +308,6 @@ $app->post("/register", function(){
 		User::setErrorRegister("Preencha a senha");
 		header("Location: /login");
 		exit;
-
 	}
 
 	if (User::checkLoginExist($_POST['email']) === true) {
@@ -318,18 +315,17 @@ $app->post("/register", function(){
 		User::setErrorRegister("Este endereço de e-mail já está send usado por outro usuário");
 		header("Location: /login");
 		exit;
-
 	}
 
 	$user = new User();
 
 	$user->setData([
-		'inadmin'=>0,
-		'deslogin'=>$_POST['email'],
-		'desperson'=>$_POST['name'],
-		'desemail'=>$_POST['email'],
-		'despassword'=>$_POST['password'],
-		'nrphone'=>$_POST['phone']
+		'inadmin' => 0,
+		'deslogin' => $_POST['email'],
+		'desperson' => $_POST['name'],
+		'desemail' => $_POST['email'],
+		'despassword' => $_POST['password'],
+		'nrphone' => $_POST['phone']
 	]);
 
 	$user->save();
@@ -338,48 +334,43 @@ $app->post("/register", function(){
 
 	header('Location: /checkout');
 	exit;
-
 });
 
-$app->get("/forgot", function() {
+$app->get("/forgot", function () {
 
 	$page = new Page();
 
-	$page->setTpl("recovery-password".DIRECTORY_SEPARATOR."forgot");
-
+	$page->setTpl("recovery-password" . DIRECTORY_SEPARATOR . "forgot");
 });
 
-$app->post("/forgot", function() {
+$app->post("/forgot", function () {
 
 	$user = User::getForgot($_POST["email"], false);
 
 	header("Location: /forgot/sent");
 	exit;
-
 });
 
-$app->get("/forgot/sent", function() {
+$app->get("/forgot/sent", function () {
 
 	$page = new Page();
 
-	$page->setTpl("recovery-password".DIRECTORY_SEPARATOR."forgot-sent");
-
+	$page->setTpl("recovery-password" . DIRECTORY_SEPARATOR . "forgot-sent");
 });
 
-$app->get("/forgot/reset", function() {
+$app->get("/forgot/reset", function () {
 
 	$user = User::validForgotDecrypt($_GET["code"]);
 
 	$page = new Page();
 
-	$page->setTpl("recovery-password".DIRECTORY_SEPARATOR."forgot-reset", array(
-		"name"=>$user["desperson"],
-		"code"=>$_GET["code"]
+	$page->setTpl("recovery-password" . DIRECTORY_SEPARATOR . "forgot-reset", array(
+		"name" => $user["desperson"],
+		"code" => $_GET["code"]
 	));
-
 });
 
-$app->post("/forgot/reset", function() {
+$app->post("/forgot/reset", function () {
 
 	$forgot = User::validForgotDecrypt($_POST["code"]);
 
@@ -390,18 +381,17 @@ $app->post("/forgot/reset", function() {
 	$user->get((int)$forgot["iduser"]);
 
 	$password = password_hash($_POST["password"], PASSWORD_DEFAULT, [
-		"cost"=>12
+		"cost" => 12
 	]);
 
 	$user->setPassword($password);
 
 	$page = new Page();
 
-	$page->setTpl("recovery-password".DIRECTORY_SEPARATOR."forgot-reset-success");
-
+	$page->setTpl("recovery-password" . DIRECTORY_SEPARATOR . "forgot-reset-success");
 });
 
-$app->get("/profile", function() {
+$app->get("/profile", function () {
 
 	User::verifyLogin(false);
 
@@ -409,15 +399,14 @@ $app->get("/profile", function() {
 
 	$page = new Page();
 
-	$page->setTpl("profile".DIRECTORY_SEPARATOR."profile", [
-		'user'=>$user->getValues(),
-		'profileMsg'=>User::getSuccess(),
-		'profileError'=>User::getError()
+	$page->setTpl("profile" . DIRECTORY_SEPARATOR . "profile", [
+		'user' => $user->getValues(),
+		'profileMsg' => User::getSuccess(),
+		'profileError' => User::getError()
 	]);
-
 });
 
-$app->post("/profile", function() {
+$app->post("/profile", function () {
 
 	User::verifyLogin(false);
 
@@ -442,9 +431,7 @@ $app->post("/profile", function() {
 			User::setError("Este endereço de e-mail já está cadastrado");
 			header('Location: /profile');
 			exit;
-
 		}
-
 	}
 
 	$_POST['inadmin'] = $user->getinadmin();
@@ -459,7 +446,90 @@ $app->post("/profile", function() {
 
 	header('Location: /profile');
 	exit;
-
 });
 
-?>
+$app->get("/order/:idorder", function ($idorder) {
+
+	User::verifyLogin(false);
+
+	$order = new Order();
+
+	$order->get((int)$idorder);
+
+	$page = new Page();
+
+	$page->setTpl("payment" . DIRECTORY_SEPARATOR . "payment", [
+		'order' => $order->getValues()
+	]);
+});
+
+$app->get("/boleto/:idorder", function ($idorder) {
+
+	User::verifyLogin(false);
+
+	$order = new Order();
+
+	$order->get((int)$idorder);
+
+	// DADOS DO BOLETO PARA O SEU CLIENTE
+	$dias_de_prazo_para_pagamento = 10;
+	$taxa_boleto = 5.00;
+	$data_venc = date("d/m/Y", time() + ($dias_de_prazo_para_pagamento * 86400));  // Prazo de X dias OU informe data: "13/04/2006"; 
+	$valor_cobrado = (float)$order->getvltotal(); // Valor - REGRA: Sem pontos na milhar e tanto faz com "." ou "," ou com 1 ou 2 ou sem casa decimal
+
+	$valor_cobrado = str_replace(",", ".", $valor_cobrado);
+	$valor_boleto = number_format($valor_cobrado + $taxa_boleto, 2, ',', '');
+
+	$dadosboleto["nosso_numero"] = $order->getidorder();  // Nosso numero - REGRA: Máximo de 8 caracteres!
+	$dadosboleto["numero_documento"] = $order->getidorder();	// Num do pedido ou nosso numero
+	$dadosboleto["data_vencimento"] = $data_venc; // Data de Vencimento do Boleto - REGRA: Formato DD/MM/AAAA
+	$dadosboleto["data_documento"] = date("d/m/Y"); // Data de emissão do Boleto
+	$dadosboleto["data_processamento"] = date("d/m/Y"); // Data de processamento do boleto (opcional)
+	$dadosboleto["valor_boleto"] = $valor_boleto; 	// Valor do Boleto - REGRA: Com vírgula e sempre com duas casas depois da virgula
+
+	// DADOS DO SEU CLIENTE
+	$dadosboleto["sacado"] = $order->getdesperson();
+	$dadosboleto["endereco1"] = $order->gesaddress()." ".$order->getdesdistrict();
+	$dadosboleto["endereco2"] = $order->getdescity()." - ".$order->getdesstate()." - ".$order->getdescountry()." - CEP: ".$order->getdeszipcode();
+
+	// INFORMACOES PARA O CLIENTE
+	$dadosboleto["demonstrativo1"] = "Pagamento de Compra na Loja Hcode E-commerce";
+	$dadosboleto["demonstrativo2"] = "Taxa bancária - R$ 0,00";
+	$dadosboleto["demonstrativo3"] = "";
+	$dadosboleto["instrucoes1"] = "- Sr. Caixa, cobrar multa de 2% após o vencimento";
+	$dadosboleto["instrucoes2"] = "- Receber até 10 dias após o vencimento";
+	$dadosboleto["instrucoes3"] = "- Em caso de dúvidas entre em contato conosco: suporte@hcode.com.br";
+	$dadosboleto["instrucoes4"] = "&nbsp; Emitido pelo sistema Projeto Loja Hcode E-commerce - www.hcode.com.br";
+
+	// DADOS OPCIONAIS DE ACORDO COM O BANCO OU CLIENTE
+	$dadosboleto["quantidade"] = "";
+	$dadosboleto["valor_unitario"] = "";
+	$dadosboleto["aceite"] = "";
+	$dadosboleto["especie"] = "R$";
+	$dadosboleto["especie_doc"] = "";
+
+
+	// ---------------------- DADOS FIXOS DE CONFIGURAÇÃO DO SEU BOLETO --------------- //
+
+
+	// DADOS DA SUA CONTA - ITAÚ
+	$dadosboleto["agencia"] = "1690"; // Num da agencia, sem digito
+	$dadosboleto["conta"] = "48781";	// Num da conta, sem digito
+	$dadosboleto["conta_dv"] = "2"; 	// Digito do Num da conta
+
+	// DADOS PERSONALIZADOS - ITAÚ
+	$dadosboleto["carteira"] = "175";  // Código da Carteira: pode ser 175, 174, 104, 109, 178, ou 157
+
+	// SEUS DADOS
+	$dadosboleto["identificacao"] = "Hcode Treinamentos";
+	$dadosboleto["cpf_cnpj"] = "24.700.731/0001-08";
+	$dadosboleto["endereco"] = "Rua Ademar Saraiva Leão, 234 - Alvarenga, 09853-120";
+	$dadosboleto["cidade_uf"] = "São Bernardo do Campo - SP";
+	$dadosboleto["cedente"] = "HCODE TREINAMENTOS LTDA - ME";
+
+	// NÃO ALTERAR!
+	$path = $_SERVER["DOCUMENT_ROOT"].DIRECTORY_SEPARATOR."assets".DIRECTORY_SEPARATOR."boletophp".DIRECTORY_SEPARATOR."include".DIRECTORY_SEPARATOR;
+	require_once($path."funcoes_itau.php");
+	require_once($path."layout_itau.php");
+
+});
