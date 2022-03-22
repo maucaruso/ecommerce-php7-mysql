@@ -73,13 +73,15 @@ class User extends Model
       ":LOGIN"=>$login
     ));
 
-    if (count($results) === 0) throw new \Exception("Usuário inexistente ou senha inválida.");
+    if (count($results) === 0) throw new \Exception("Usuário inexistente ou senha inválida.2");
 
     $data = $results[0];
 
-    if (password_verify($password, $data["despassword"])) {
+    if (password_verify($password, $data["despassword"]) === true) {
 
       $user = new User();
+
+      $data['desperson'] = utf8_encode($data['desperson']);
 
       $user->setData($data);
 
@@ -89,7 +91,7 @@ class User extends Model
 
     } else {
 
-      throw new \Exception("Usuário inexistente ou senha inválida.");
+      throw new \Exception("Usuário inexistente ou senha inválida1.");
 
     }
 
@@ -152,7 +154,11 @@ class User extends Model
       ":iduser"=>$iduser
     ));
 
-    $this->setData($results[0]);
+    $data = $results[0];
+
+    $data['desperson'] = utf8_encode($data['desperson']);
+
+    $this->setData($data);
 
   }
 
@@ -316,7 +322,7 @@ class User extends Model
   public static function clearError()
   {
 
-    $_SESSION[User::SUCCESS] = NULL;
+    $_SESSION[User::ERROR] = NULL;
 
   }
   
